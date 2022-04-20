@@ -1,0 +1,103 @@
+---
+- debug:
+    msg: teku beacon tasks
+
+- name: check that tar_url ends in tar.gz
+  assert:
+    that: teku.release.tar_url | regex_search('.tar.gz$')
+
+- name: check that checksum format is correct
+  assert:
+    that: teku.release.checksum | regex_search('^(md5|sha256):')
+
+- name: check that ports are free
+  block:
+    - name: check that ports are free
+      shell: ss -Hanp sport {{ item }}
+      register: this
+      failed_when: this.stdout
+      changed_when: no
+      loop:
+        - "{{ teku.beacon.network[network.consensus].metrics_port }}"
+        - "{{ teku.beacon.network[network.consensus].rest_api_port }}"
+        - "{{ teku.beacon.network[network.consensus].p2p_port }}"
+  rescue:
+    - name: stop {{ teku.beacon.network[network.execution].systemd_service_name }}.service
+      service:
+        name: "{{ teku.beacon.network[network.execution].systemd_service_name }}.service"
+        state: stopped
+
+- name: derive facts
+  set_fact:
+    tar_archive_name: "{{ (teku.release.tar_url).split('/')[-1] | regex_replace('.tar.gz', '') }}"
+
+- name: add user
+  user:
+    name: "{{ teku.beacon.user }}"
+    system: yes
+    shell: /usr/bin/false
+
+- name: create release dir
+  file:
+    path: "{{ teku.release.dir }}"
+    state: directory
+
+- name: create beacon dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ teku.beacon.user }}"
+    group: "{{ teku.beacon.user }}"
+  loop:
+    - "{{ teku.release.dir }}/beacon"
+    - "{{ teku.beacon.network[network.consensus].data_dir }}"
+
+- name: check if already downloaded
+  stat:
+    path: "{{ teku.release.dir }}/{{ (teku.release.tar_url).split('/')[-1] }}"
+  register: this
+
+- name: download
+  get_url:
+    url: "{{ teku.release.tar_url }}"
+    dest: "{{ teku.release.dir }}"
+    checksum: "{{ teku.release.checksum }}"
+    mode: "0700"
+  when: not this.stat.exists
+
+- name: check if already extracted
+  stat:
+    path: "{{ teku.release.dir }}/{{ tar_archive_name }}"
+  register: this
+
+- name: unarchive
+  unarchive:
+    remote_src: yes
+    src: "{{ teku.release.dir }}/{{ (teku.release.tar_url).split('/')[-1] }}"
+    dest: "{{ teku.release.dir }}/beacon"
+    owner: "{{ teku.beacon.user }}"
+    group: "{{ teku.beacon.user }}"
+  when: not this.stat.exists
+
+- name: create symlink
+  file:
+    src: "{{ teku.release.dir }}/beacon/{{ tar_archive_name }}/bin/teku"
+    dest: "{{ teku.release.dir}}/beacon/teku"
+    state: link
+    owner: "{{ teku.beacon.user }}"
+    group: "{{ teku.beacon.user }}"
+
+- name: create {{ teku.beacon.network[network.consensus].systemd_service_name }}.service
+  template:
+    src: ../templates/teku-beacon.service.j2
+    dest: /etc/systemd/system/{{ teku.beacon.network[network.consensus].systemd_service_name }}.service
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: enable {{ teku.beacon.network[network.consensus].systemd_service_name }}.service
+  service:
+    name: "{{ teku.beacon.network[network.consensus].systemd_service_name }}.service"
+    state: started
+    enabled: yes

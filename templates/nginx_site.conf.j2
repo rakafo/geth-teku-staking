@@ -1,0 +1,16 @@
+server {
+        server_name {{ monitoring.grafana.domain.base }};
+        listen 80;
+        root /var/www/html;
+        index index.html;
+
+        location / {
+            return 444;
+        }
+
+        location /{{ monitoring.grafana.domain.path }}/ {
+                proxy_set_header Host $http_host;
+                proxy_pass http://localhost:9000/;
+        }
+
+}

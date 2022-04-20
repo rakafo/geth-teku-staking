@@ -1,0 +1,83 @@
+- debug:
+    msg: nginx tasks
+
+- name: install
+  package:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - nginx
+    - certbot
+    - python3-certbot-nginx
+
+- name: allow nginx through firewall
+  firewalld:
+    service: "{{ item }}"
+    state: enabled
+    permanent: yes
+    immediate: yes
+  loop:
+    - http
+    - https
+
+- name: disable default site
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    insertafter: "server_name"
+    firstmatch: yes
+    line: "        return 444;"
+
+- name: change html dir location
+  lineinfile:
+    path: /etc/nginx/nginx.conf
+    regexp: "^        root         "
+    line: "        root         /var/www/html;"
+
+- name: check if new domain already exists
+  stat:
+    path: /etc/nginx/conf.d/{{ monitoring.grafana.domain.base }}.conf
+  register: this
+
+- name: add new domain
+  template:
+    src: templates/nginx_site.conf.j2
+    dest: "/etc/nginx/conf.d/{{ monitoring.grafana.domain.base }}.conf"
+  when: not this.stat.exists
+
+- name: start nginx
+  service:
+    name: nginx
+    state: started
+    enabled: yes
+
+- name: check if cert already exists
+  stat:
+    path: /etc/letsencrypt/live/{{ monitoring.grafana.domain.base }}
+  register: this
+
+- name: generate cert
+  shell:
+    cmd: >
+      certbot \
+        -d  {{ monitoring.grafana.domain.base }} \
+        --nginx \
+        --register-unsafely-without-email \
+        --non-interactive \
+        --agree-tos
+  register: cert
+  when: not this.stat.exists
+
+- debug:
+    var: cert
+  when: not this.stat.exists
+
+- name: restart nginx
+  service:
+    name: nginx
+    state: restarted
+
+- name: allow proxy connections
+  seboolean:
+    name: httpd_can_network_relay
+    state: yes
+    persistent: yes

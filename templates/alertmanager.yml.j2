@@ -1,0 +1,18 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 24h
+  receiver: 'email'
+receivers:
+- name: 'email'
+  email_configs:
+  - to: {{ monitoring.alertmanager.email.to }}
+    from: {{ monitoring.alertmanager.email.from }}
+    smarthost: {{ monitoring.alertmanager.email.smarthost }}
+    auth_username: {{ monitoring.alertmanager.email.auth_username }}
+    auth_identity: {{ monitoring.alertmanager.email.auth_identity }}
+    auth_password: {{ monitoring.alertmanager.email.auth_password }}

@@ -1,0 +1,13 @@
+[Unit]
+Description=Prometheus node_exporter
+After=network.target
+
+[Service]
+User={{ monitoring.node_exporter.user }}
+Group={{ monitoring.node_exporter.user }}
+Type=simple
+Restart=on-failure
+ExecStart=/usr/local/bin/node_exporter
+
+[Install]
+WantedBy=multi-user.target

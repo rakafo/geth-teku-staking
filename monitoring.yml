@@ -1,0 +1,11 @@
+---
+- hosts: "{{ host }}"
+  gather_facts: no
+  vars_files: vars/all.yml
+  tasks:
+    - import_tasks: tasks/monitoring/prometheus.yml
+    - import_tasks: tasks/monitoring/node_exporter.yml
+    - import_tasks: tasks/monitoring/alertmanager.yml
+    - import_tasks: tasks/monitoring/nginx.yml
+      when: monitoring.grafana.use_domain
+    - import_tasks: tasks/monitoring/grafana.yml

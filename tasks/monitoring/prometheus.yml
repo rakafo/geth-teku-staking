@@ -1,0 +1,138 @@
+---
+- debug:
+    msg: prometheus tasks
+
+- name: check that tar ends in tar.gz
+  assert:
+    that: monitoring.prometheus.tar_url | regex_search('.tar.gz$')
+
+- name: derive tar archive name
+  set_fact:
+    tar_archive_name: "{{ (monitoring.prometheus.tar_url).split('/')[-1] | regex_replace('.tar.gz', '') }}"
+
+- name: add user
+  user:
+    name: "{{ monitoring.prometheus.user }}"
+    system: yes
+    shell: /usr/bin/false
+
+- name: create dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ monitoring.prometheus.user }}"
+    group: "{{ monitoring.prometheus.user }}"
+  loop:
+    - "{{ monitoring.prometheus.dir.config }}"
+    - "{{ monitoring.prometheus.dir.data }}"
+
+- name: check if already downloaded
+  stat:
+    path: "/tmp/{{ (monitoring.prometheus.tar_url).split('/')[-1] }}"
+  register: this
+
+- name: download
+  get_url:
+    url: "{{ monitoring.prometheus.tar_url }}"
+    dest: /tmp
+    mode: "0700"
+    owner: "{{ monitoring.prometheus.user }}"
+    group: "{{ monitoring.prometheus.user }}"
+  when: not this.stat.exists
+
+- name: check if already extracted
+  stat:
+    path: "/tmp/{{ tar_archive_name }}"
+  register: this
+
+- name: extract
+  unarchive:
+    src: "/tmp/{{ (monitoring.prometheus.tar_url).split('/')[-1] }}"
+    dest: /tmp
+    remote_src: yes
+  when: not this.stat.exists
+
+- name: copy to {{ monitoring.prometheus.dir.config }}
+  copy:
+    src: "{{ item }}"
+    dest: "{{ monitoring.prometheus.dir.config }}"
+    mode: "0700"
+    owner: "{{ monitoring.prometheus.user }}"
+    group: "{{ monitoring.prometheus.user }}"
+    remote_src: yes
+  loop:
+    - /tmp/{{ tar_archive_name }}/consoles
+    - /tmp/{{ tar_archive_name }}/console_libraries
+
+- name: copy to /usr/local/bin
+  copy:
+    src: "{{ item }}"
+    dest: /usr/local/bin
+    mode: "0700"
+    owner: "{{ monitoring.prometheus.user }}"
+    group: "{{ monitoring.prometheus.user }}"
+    remote_src: yes
+  loop:
+    - /tmp/{{ tar_archive_name }}/prometheus
+    - /tmp/{{ tar_archive_name }}/promtool
+
+- name: check if prometheus.yml already exists
+  stat:
+    path: "{{ monitoring.prometheus.dir.config }}/prometheus.yml"
+  register: this
+
+- name: create prometheus.yml
+  template:
+    src: templates/prometheus.yml.j2
+    dest: "{{ monitoring.prometheus.dir.config }}/prometheus.yml"
+    owner: "{{ monitoring.prometheus.user }}"
+    group: "{{ monitoring.prometheus.user }}"
+  when: not this.stat.exists
+
+- name: edit prometheus.yml for beacon
+  blockinfile:
+    block: |2
+        - job_name: {{ teku.beacon.network[network.consensus].systemd_service_name }}
+          static_configs:
+            - targets:
+                - localhost:{{ teku.beacon.network[network.consensus].metrics_port }}
+    dest: "{{ monitoring.prometheus.dir.config }}/prometheus.yml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK {{ teku.beacon.network[network.consensus].systemd_service_name }}"
+
+- name: edit prometheus.yml for validator
+  blockinfile:
+    block: |2
+        - job_name: {{ teku.validator.network[network.consensus].systemd_service_name }}
+          static_configs:
+            - targets:
+                - localhost:{{ teku.validator.network[network.consensus].metrics_port }}
+    dest: "{{ monitoring.prometheus.dir.config }}/prometheus.yml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK {{ teku.validator.network[network.consensus].systemd_service_name }}"
+
+- name: insert an empty line before the marker line
+  replace:
+    path: /etc/prometheus/prometheus.yml
+    regexp: "(?<=.\n)# BEGIN ANSIBLE MANAGED"
+    replace: "\n# BEGIN ANSIBLE MANAGED"
+
+- name: create prometheus.service
+  template:
+    src: templates/prometheus.service.j2
+    dest: /etc/systemd/system/prometheus.service
+
+- name: restorecon
+  shell: restorecon -R {{ item }}
+  loop:
+    - "{{ monitoring.prometheus.dir.config }}"
+    - "{{ monitoring.prometheus.dir.data }}"
+  changed_when: no
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: start prometheus
+  service:
+    name: prometheus
+    state: started
+    enabled: yes

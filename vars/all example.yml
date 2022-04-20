@@ -1,0 +1,95 @@
+---
+host: staking
+
+network:
+  execution: goerli # mainnet|goerli
+  consensus: prater # mainnet|prater
+
+geth:
+  release:
+    tar_url: https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.10.17-25c9b49f.tar.gz
+    checksum: md5:d77405bf3bc024a624bcf9f79812e61d
+    dir: /opt/geth
+  user: geth
+  network:
+    mainnet:
+      rpc_port: 8545
+      listening_port: 30303
+      systemd_service_name: geth
+      data_dir: /var/lib/geth
+      network: --mainnet
+    goerli:
+      rpc_port: 8546
+      listening_port: 30304
+      systemd_service_name: geth-goerli
+      data_dir: /var/lib/geth-goerli
+      network: --goerli
+
+teku:
+  release:
+    tar_url: https://artifacts.consensys.net/public/teku/raw/names/teku.tar.gz/versions/22.3.2/teku-22.3.2.tar.gz
+    checksum: sha256:3b6021f872f5f4d34fa205ed89f3731f53430f1eb71524923489404633cea737
+    dir: /opt/teku
+  beacon:
+    user: teku-beacon
+    network:
+      mainnet:
+        metrics_port: 8008
+        rest_api_port: 5051
+        p2p_port: 9000
+        rpc_port: "{{ geth.network.mainnet.rpc_port }}"
+        data_dir: /var/lib/teku-beacon
+        systemd_service_name: teku-beacon
+      prater:
+        metrics_port: 8009
+        rest_api_port: 5052
+        p2p_port: 9001
+        rpc_port: "{{ geth.network.goerli.rpc_port }}"
+        data_dir: /var/lib/teku-beacon-prater
+        systemd_service_name: teku-beacon-prater
+  validator:
+    user: teku-validator
+    network:
+      mainnet:
+        metrics_port: 8108
+        data_dir: /var/lib/teku-validator
+        systemd_service_name: teku-validator
+      prater:
+        metrics_port: 8109
+        data_dir: /var/lib/teku-validator-prater
+        wallet_dir: /var/lib/teku-validator-wallet-prater
+        systemd_service_name: teku-validator-prater
+
+monitoring:
+  prometheus:
+    tar_url: https://github.com/prometheus/prometheus/releases/download/v2.34.0/prometheus-2.34.0.linux-amd64.tar.gz
+    user: prometheus
+    dir:
+      config: /etc/prometheus
+      data: /var/lib/prometheus
+  node_exporter:
+    tar_url: https://github.com/prometheus/node_exporter/releases/download/v1.3.1/node_exporter-1.3.1.linux-amd64.tar.gz
+    user: node_exporter
+    dir:
+      data: /var/lib/node_exporter
+  alertmanager:
+    tar_url: https://github.com/prometheus/alertmanager/releases/download/v0.24.0/alertmanager-0.24.0.linux-amd64.tar.gz
+    user: alertmanager
+    dir:
+      data: /var/lib/alertmanager
+      config: /etc/alertmanager
+    email:
+      to: your@email.com
+      from: your@email.com
+      smarthost: smtp.gmail.com:587
+      auth_username: your@email.com
+      auth_identity: your@email.com
+      auth_password: youremailpassword
+  grafana:
+    use_domain: yes
+    domain:
+      base: static.4.3.2.1.clients.your-server.de
+      path: grafana
+
+infura:
+  eth2: https://{project id}:{project secret}@eth2-beacon-{{ network.consensus }}.infura.io

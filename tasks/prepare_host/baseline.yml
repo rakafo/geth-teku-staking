@@ -1,0 +1,52 @@
+---
+- debug:
+    msg: Configure services
+
+- name: install packages
+  package:
+    name: "{{ item }}"
+    state: latest
+  loop:
+    - firewalld
+    - policycoreutils
+    - policycoreutils-python-utils
+    - vim
+    - curl
+    - wget
+
+- name: start firewalld
+  service:
+    name: firewalld
+    state: started
+    enabled: yes
+
+- name: configure firewalld
+  firewalld:
+    masquerade: yes
+    state: enabled
+    permanent: yes
+    immediate: yes
+
+- name: configure firewalld 2
+  firewalld:
+    service: "{{ item }}"
+    state: disabled
+    permanent: yes
+    immediate: yes
+  loop:
+    - cockpit
+    - dhcpv6-client
+
+- name: start selinux
+  selinux:
+    policy: targeted
+    state: enforcing
+
+- name: get timezone
+  set_fact:
+    timezone: >-
+      {{ lookup('pipe', "timedatectl show | grep Timezone= | awk -F= '{ print $2 }'") }}
+
+- name: set timezone
+  timezone:
+    name: "{{ timezone }}"

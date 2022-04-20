@@ -1,0 +1,19 @@
+[Unit]
+Description=Go Ethereum Client
+After=network.target
+Wants=network.target
+
+[Service]
+User={{ geth.user }}
+Group={{ geth.user }}
+Type=simple
+Restart=no
+ExecStart={{ geth.release.dir }}/geth \
+    --http \
+    --http.port={{ geth.network[network.execution].rpc_port }} \
+    --port={{ geth.network[network.execution].listening_port }} \
+    --datadir={{ geth.network[network.execution].data_dir }} \
+    {{ geth.network[network.execution].network }}
+
+[Install]
+WantedBy=default.target

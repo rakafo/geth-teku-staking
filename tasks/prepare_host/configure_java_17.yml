@@ -1,0 +1,28 @@
+---
+- debug:
+    msg: Configure java 17 (for teku)
+
+- name: install java-17
+  package:
+    name: java-17-openjdk
+    state: present
+
+- package_facts:
+
+- name: create temp var
+  set_fact:
+    java17_path_raw: >
+      /usr/lib/jvm/java-17-openjdk-
+      {{ ansible_facts.packages["java-17-openjdk"].0.version }}-
+      {{ ansible_facts.packages["java-17-openjdk"].0.release }}.
+      x86_64/bin/java
+
+- name: parse var
+  set_fact:
+    java17_path: "{{ java17_path_raw | regex_replace(' |\n', '') }}"
+
+- name: set correct java version
+  alternatives:
+    name: java
+    path: "{{ java17_path }}"
+    link: /usr/bin/java

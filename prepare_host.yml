@@ -1,0 +1,14 @@
+---
+- hosts: "{{ host}}"
+  gather_facts: yes
+  vars_files: vars/all.yml
+  tasks:
+    - assert:
+        that:
+          - ansible_distribution|regex_search('^AlmaLinux$')
+          - ansible_distribution_major_version|regex_search('^8$')
+        fail_msg: tested only on almalinux 8
+
+    - import_tasks: tasks/prepare_host/baseline.yml
+    - import_tasks: tasks/prepare_host/harden_ssh.yml
+    - import_tasks: tasks/prepare_host/configure_java_17.yml # for teku

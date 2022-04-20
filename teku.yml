@@ -1,0 +1,7 @@
+---
+- hosts: "{{ host }}"
+  gather_facts: no
+  vars_files: vars/all.yml
+  tasks:
+    - import_tasks: tasks/teku/beacon.yml
+    - import_tasks: tasks/teku/validator.yml

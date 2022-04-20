@@ -1,0 +1,27 @@
+[Unit]
+Description=Teku Ethereum Client Beacon Node
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ teku.beacon.user }}
+Group={{ teku.beacon.user }}
+Type=simple
+Restart=no
+ExecStart={{ teku.release.dir }}/beacon/teku \
+    --data-base-path={{ teku.beacon.network[network.consensus].data_dir }} \
+    --eth1-endpoint=http://localhost:{{ teku.beacon.network[network.consensus].rpc_port }} \
+    --initial-state={{ infura.eth2 }}/eth/v2/debug/beacon/states/finalized \
+    --network={{ network.consensus }} \
+    --metrics-enabled=true \
+    --metrics-port={{ teku.beacon.network[network.consensus].metrics_port }} \
+    --rest-api-enabled \
+    --rest-api-port={{ teku.beacon.network[network.consensus].rest_api_port }} \
+    --p2p-port={{ teku.beacon.network[network.consensus].p2p_port }}
+
+[Install]
+WantedBy=multi-user.target
+
+
+# https://docs.teku.consensys.net/en/latest/HowTo/Get-Started/Run-Teku/
+# beacon options: https://docs.teku.consensys.net/en/latest/Reference/CLI/CLI-Syntax/

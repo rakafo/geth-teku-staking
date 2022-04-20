@@ -1,0 +1,6 @@
+---
+- hosts: "{{ host }}"
+  gather_facts: no
+  vars_files: vars/all.yml
+  tasks:
+    - import_tasks: tasks/teku/keys.yml

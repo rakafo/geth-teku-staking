@@ -1,0 +1,4 @@
+legacy/
+artifacts/
+test.yml
+vars/all.yml

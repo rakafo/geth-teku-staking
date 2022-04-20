@@ -1,0 +1,18 @@
+[Unit]
+Description=AlertManager Server Service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ monitoring.alertmanager.user }}
+Group={{ monitoring.alertmanager.user }}
+Type=simple
+Restart=on-failure
+ExecStart=/usr/local/bin/alertmanager \
+    --config.file={{ monitoring.alertmanager.dir.config }}/alertmanager.yml \
+    --storage.path={{ monitoring.alertmanager.dir.data }}
+
+[Install]
+WantedBy=multi-user.target
+
+# cmdline options: https://gist.github.com/0x0I/4eb3d7841562d215b50f05dee64fa0dc

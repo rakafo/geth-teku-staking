@@ -1,0 +1,130 @@
+---
+- debug:
+    msg: prometheus - alertmanager tasks
+
+- name: check that tar ends in tar.gz
+  assert:
+    that: monitoring.alertmanager.tar_url | regex_search('.tar.gz$')
+
+- name: derive tar archive name
+  set_fact:
+    tar_archive_name: "{{ (monitoring.alertmanager.tar_url).split('/')[-1] | regex_replace('.tar.gz', '') }}"
+
+- name: add user
+  user:
+    name: "{{ monitoring.alertmanager.user }}"
+    system: yes
+    shell: /usr/bin/false
+
+- name: create dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ monitoring.alertmanager.user }}"
+    group: "{{ monitoring.alertmanager.user }}"
+  loop:
+    - "{{ monitoring.alertmanager.dir.config }}"
+    - "{{ monitoring.alertmanager.dir.data }}"
+
+- name: check if already downloaded
+  stat:
+    path: "/tmp/{{ (monitoring.alertmanager.tar_url).split('/')[-1] }}"
+  register: this
+
+- name: download
+  get_url:
+    url: "{{ monitoring.alertmanager.tar_url }}"
+    dest: /tmp
+    mode: "0700"
+    owner: "{{ monitoring.alertmanager.user }}"
+    group: "{{ monitoring.alertmanager.user }}"
+  when: not this.stat.exists
+
+- name: check if already extracted
+  stat:
+    path: "/tmp/{{ tar_archive_name }}"
+  register: this
+
+- name: extract
+  unarchive:
+    src: "/tmp/{{ (monitoring.alertmanager.tar_url).split('/')[-1] }}"
+    dest: /tmp
+    remote_src: yes
+  when: not this.stat.exists
+
+- name: copy to /usr/local/bin
+  copy:
+    src: "{{ item }}"
+    dest: /usr/local/bin
+    mode: "0700"
+    owner: "{{ monitoring.alertmanager.user }}"
+    group: "{{ monitoring.alertmanager.user }}"
+    remote_src: yes
+  loop:
+    - /tmp/{{ tar_archive_name }}/alertmanager
+    - /tmp/{{ tar_archive_name }}/amtool
+
+- name: create alertmanager.yml
+  template:
+    src: templates/alertmanager.yml.j2
+    dest: "{{ monitoring.alertmanager.dir.config }}/alertmanager.yml"
+    owner: "{{ monitoring.alertmanager.user }}"
+    group: "{{ monitoring.alertmanager.user }}"
+
+- name: copy alertmanager-node_alert_rules.yml
+  copy:
+    src: templates/alertmanager-node_alert_rules.yml
+    dest: "{{ monitoring.prometheus.dir.config }}/node_alert_rules.yml"
+    owner: "{{ monitoring.prometheus.user }}"
+    group: "{{ monitoring.prometheus.user }}"
+
+- name: edit prometheus.yml for alertmanager
+  blockinfile:
+    insertbefore: scrape_configs
+    block: |2
+      alerting:
+        alertmanagers:
+          - static_configs:
+              - targets:
+                  - localhost:9093
+      rule_files:
+        - "node_alert_rules.yml"
+    dest: "{{ monitoring.prometheus.dir.config }}/prometheus.yml"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK alertmanager"
+
+- name: insert an empty line before the marker line
+  replace:
+    path: /etc/prometheus/prometheus.yml
+    regexp: "(?<=.\n)# BEGIN ANSIBLE MANAGED"
+    replace: "\n# BEGIN ANSIBLE MANAGED"
+
+- name: insert an empty line before "scrape_configs:"
+  replace:
+    path: /etc/prometheus/prometheus.yml
+    regexp: "(?<=.\n)scrape_configs:"
+    replace: "\nscrape_configs:"
+
+- name: create alertmanager.service
+  template:
+    src: templates/alertmanager.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+
+- name: restorecon
+  shell: restorecon -R "{{ monitoring.alertmanager.dir.data }}"
+  changed_when: no
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart prometheus
+  service:
+    name: prometheus
+    state: restarted
+    enabled: yes
+
+- name: start alertmanager
+  service:
+    name: alertmanager
+    state: started
+    enabled: yes

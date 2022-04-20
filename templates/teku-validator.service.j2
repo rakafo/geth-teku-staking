@@ -1,0 +1,27 @@
+[Unit]
+Description=Teku Ethereum Client Validator Node
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ teku.validator.user }}
+Group={{ teku.validator.user }}
+IPAddressDeny=any
+IPAddressAllow=localhost
+Type=simple
+Restart=no
+ExecStart={{ teku.release.dir }}/validator/teku \
+    validator-client \
+    --data-base-path={{ teku.validator.network[network.consensus].data_dir }} \
+    --network=auto \
+    --beacon-node-api-endpoint=http://localhost:{{ teku.beacon.network[network.consensus].rest_api_port }} \
+    --metrics-enabled=true \
+    --metrics-port={{ teku.validator.network[network.consensus].metrics_port }} \
+    --validator-keys={{ teku.validator.network[network.consensus].wallet_dir }}/validator_keys:{{ teku.validator.network[network.consensus].wallet_dir }}
+
+[Install]
+WantedBy=multi-user.target
+
+
+# https://docs.teku.consensys.net/en/latest/HowTo/Get-Started/Run-Teku/
+# validator options: https://docs.teku.consensys.net/en/latest/Reference/CLI/Subcommands/Validator-Client/

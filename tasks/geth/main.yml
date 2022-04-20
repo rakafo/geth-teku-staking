@@ -1,0 +1,98 @@
+---
+- debug:
+    msg: geth tasks
+
+- name: check that tar_url ends in tar.gz
+  assert:
+    that: geth.release.tar_url | regex_search('.tar.gz$')
+
+- name: check that checksum format is correct
+  assert:
+    that: geth.release.checksum | regex_search('^(md5|sha256):')
+
+- name: check that ports are free
+  block:
+    - name: check that ports are free
+      shell: ss -Hanp sport {{ item }}
+      register: this
+      failed_when: this.stdout
+      changed_when: no
+      loop:
+        - "{{ geth.network[network.execution].rpc_port }}"
+        - "{{ geth.network[network.execution].listening_port }}"
+  rescue:
+    - name: stop {{ geth.network[network.execution].systemd_service_name }}.service
+      service:
+        name: "{{ geth.network[network.execution].systemd_service_name }}.service"
+        state: stopped
+
+- name: derive facts
+  set_fact:
+    tar_archive_name: "{{ (geth.release.tar_url).split('/')[-1] | regex_replace('.tar.gz', '') }}"
+
+- name: add user
+  user:
+    name: "{{ geth.user }}"
+    shell: /usr/bin/false
+    system: yes
+
+- name: create dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ geth.user }}"
+    group: "{{ geth.user }}"
+  loop:
+    - "{{ geth.release.dir }}"
+    - "{{ geth.network[network.execution].data_dir }}"
+
+- name: check if already downloaded
+  stat:
+    path: "{{ geth.release.dir }}/{{ (geth.release.tar_url).split('/')[-1] }}"
+  register: this
+
+- name: download
+  get_url:
+    url: "{{ geth.release.tar_url }}"
+    checksum: "{{ geth.release.checksum }}"
+    dest: "{{ geth.release.dir }}"
+    owner: "{{ geth.user }}"
+    group: "{{ geth.user }}"
+  when: not this.stat.exists
+
+- name: check if already extracted
+  stat:
+    path: "{{ geth.release.dir }}/{{ tar_archive_name }}"
+  register: this
+
+- name: unarchive
+  unarchive:
+    remote_src: yes
+    src: "{{ geth.release.dir }}/{{ (geth.release.tar_url).split('/')[-1] }}"
+    dest: "{{ geth.release.dir }}"
+    owner: "{{ geth.user }}"
+    group: "{{ geth.user }}"
+  when: not this.stat.exists
+
+- name: create symlink
+  file:
+    src: "{{ geth.release.dir }}/{{ tar_archive_name }}/geth"
+    dest: "{{ geth.release.dir }}/geth"
+    state: link
+
+- name: create {{ geth.network[network.execution].systemd_service_name }}.service
+  template:
+    src: ../templates/geth.service.j2
+    dest: /etc/systemd/system/{{ geth.network[network.execution].systemd_service_name }}.service
+    lstrip_blocks: yes
+    trim_blocks: yes
+
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: enable {{ geth.network[network.execution].systemd_service_name }}.service
+  service:
+    name: "{{ geth.network[network.execution].systemd_service_name }}.service"
+    state: started
+    enabled: yes

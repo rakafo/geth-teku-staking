@@ -1,0 +1,42 @@
+- set_fact:
+    playbook: grafana
+
+- name: "{{ playbook }} - install"
+  package:
+    name: grafana
+    state: present
+
+- name: "{{ playbook }} - modify 1"
+  lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: "^domain=localhost"
+    line: domain={{ monitoring.grafana.domain.base }}
+  when: monitoring.grafana.use_domain
+
+- name: "{{ playbook }} - modify 2"
+  lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: "^root_url ="
+    line: root_url = %(protocol)s://%(domain)s:%(http_port)s/{{ monitoring.grafana.domain.path }}/
+  when: monitoring.grafana.use_domain
+
+- name: "{{ playbook }} - modify 3"
+  lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: "^serve_from_sub_path = false"
+    line: serve_from_sub_path = true
+  when: monitoring.grafana.use_domain
+
+# task so sel boolean httpd_can_network_relay can be used, which is a more restricted version of httpd_can_network_connect
+- name: "{{ playbook }} - modify 4"
+  lineinfile:
+    path: /etc/grafana/grafana.ini
+    regexp: "^http_port = "
+    line: http_port = 9000
+  when: monitoring.grafana.use_domain
+
+- name: "{{ playbook }} - start"
+  service:
+    name: grafana-server
+    state: started
+    enabled: yes

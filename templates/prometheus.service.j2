@@ -1,0 +1,18 @@
+[Unit]
+Description=Prometheus Time Series Collection and Processing Server
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ monitoring.prometheus.user }}
+Group={{ monitoring.prometheus.user }}
+Type=simple
+Restart=on-failure
+ExecStart=/usr/local/bin/prometheus \
+    --config.file={{ monitoring.prometheus.dir.config }}/prometheus.yml \
+    --storage.tsdb.path={{ monitoring.prometheus.dir.data }} \
+    --web.console.templates={{ monitoring.prometheus.dir.config }}/consoles \
+    --web.console.libraries={{ monitoring.prometheus.dir.config }}/console_libraries
+
+[Install]
+WantedBy=multi-user.target

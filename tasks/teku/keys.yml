@@ -1,0 +1,44 @@
+---
+- name: add user
+  user:
+    name: "{{ teku.validator.user }}"
+    system: yes
+    shell: /usr/bin/false
+
+- name: create dir
+  file:
+    path: "{{ teku.validator.network[network.consensus].wallet_dir }}/validator_keys"
+    state: directory
+    mode: "u=rwX,g=,o="
+
+- name: pause execution until user input
+  pause:
+    prompt: |
+      store the following files manually and click enter:
+      keystore-X.json in {{ teku.validator.network[network.consensus].wallet_dir }}/validator_keys
+      keystore-X.txt in {{ teku.validator.network[network.consensus].wallet_dir }}
+
+- name: check .json files exist
+  find:
+    paths: "{{ teku.validator.network[network.consensus].wallet_dir }}/validator_keys"
+    patterns: "keystore-*.json"
+  register: this
+  failed_when: this.matched|int == 0
+
+- name: check .txt files exist
+  find:
+    paths: "{{ teku.validator.network[network.consensus].wallet_dir }}"
+    patterns: "keystore-*.txt"
+  register: this
+  failed_when: this.matched|int == 0
+
+- name: fix permissions
+  file:
+    path: "{{ item }}"
+    recurse: yes
+    owner: "{{ teku.validator.user }}"
+    group: "{{ teku.validator.user }}"
+    mode: "u=rwX,g=,o="
+  loop:
+    - "{{ teku.validator.network[network.consensus].wallet_dir }}"
+    - "{{ teku.validator.network[network.consensus].wallet_dir }}/validator_keys"

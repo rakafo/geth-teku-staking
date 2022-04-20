@@ -1,0 +1,41 @@
+- debug:
+    msg: harden ssh
+
+- name: get authorized_keys size
+  stat:
+    path: "~{{ ansible_user }}/.ssh/authorized_keys"
+  register: this
+
+- name: check authorized_keys size
+  assert:
+    that: this.stat.size|int > 10
+    fail_msg: authorized_keys file doesn't contain a key
+
+- name: disable password authentication
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: ^PasswordAuthentication
+    line: PasswordAuthentication no
+
+- name: leave only ed25519 key generation algorithm
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^HostKey(?:(?!ed25519).)+$"
+    state: absent
+
+- name: disable root login
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^PermitRootLogin"
+    line: PermitRootLogin no
+
+- name: allow only user {{ ansible_user }}
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^AllowUsers"
+    line: AllowUsers {{ ansible_user }}
+
+- name: reload sshd
+  service:
+    name: sshd
+    state: reloaded
