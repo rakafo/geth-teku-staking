@@ -22,10 +22,13 @@
         - "{{ teku.beacon.network[network.consensus].rest_api_port }}"
         - "{{ teku.beacon.network[network.consensus].p2p_port }}"
   rescue:
-    - name: stop {{ teku.beacon.network[network.execution].systemd_service_name }}.service
+    - name: stop {{ teku.beacon.network[network.consensus].systemd_service_name }}.service
       service:
-        name: "{{ teku.beacon.network[network.execution].systemd_service_name }}.service"
+        name: "{{ teku.beacon.network[network.consensus].systemd_service_name }}.service"
         state: stopped
+    - name: wait for 10s for ports to free up
+      wait_for:
+        timeout: 10
 
 - name: derive facts
   set_fact:
