@@ -1,6 +1,11 @@
 - debug:
     msg: nginx tasks
 
+- name: install repo
+  package:
+    name: epel-release
+    state: present
+
 - name: install
   package:
     name: "{{ item }}"

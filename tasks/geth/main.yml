@@ -25,6 +25,9 @@
       service:
         name: "{{ geth.network[network.execution].systemd_service_name }}.service"
         state: stopped
+    - name: wait for 10s for ports to free up
+      wait_for:
+        timeout: 10
 
 - name: derive facts
   set_fact:

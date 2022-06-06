@@ -69,16 +69,10 @@ Meant to replace centos 8.
 
 ### geth or teku released a new version. What needs changing?
 
-1. `systemctl stop {geth systemd_service_name}`
+1. update relevant release dictionary to new values;
+2. re-run relevant playbook;
 
-   `systemctl stop {teku beacon systemd_service_name}`;
-
-   `systemctl stop {teku validator systemd_service_name}`;
-
-2. update relevant release dictionary to new values;
-3. re-run relevant playbook;
-
-If you need to revert, repeat the previous steps, just change the values in step 2 to old ones.
+If you need to revert, repeat the previous steps, just change the values in step 2 to old ones. Systemd services will be restarted.
 
 ### why is teku beacon and validator running separately?
 
@@ -97,6 +91,15 @@ Security benefits over running together:
 - os extensive: https://grafana.com/grafana/dashboards/1860
 
 ## security
+
+### how to securely transfer keys without exposing them to copy/paste buffer?
+
+one of the options - Ansible itself.
+
+1. `dnf install ansible` - on node and environment where you're creating keys;
+2. `ansible-vault encrypt keystore keystore-X.json` - password doesn't need to be guarded as it's used only temporarly;
+3. copy/paste that value to node;
+4. `ansible-vault decrypt keystore keystore-X.json`;
 
 ### what can be done to further increase security?
 
